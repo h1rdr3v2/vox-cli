@@ -1,0 +1,73 @@
+# vox model catalog. Curated models that `vox models pull <id>` knows by name.
+# Any other MLX model on Hugging Face can be pulled as hf:<org>/<repo> --type stt|tts.
+#
+# Fields: id, type (stt|tts), engine, repo (Hugging Face), size_mb (approximate
+# download), note, languages, and optionally recommended, revision, default_voice.
+
+version = 1
+
+[[model]]
+id = "whisper-tiny"
+type = "stt"
+engine = "mlx-whisper"
+repo = "mlx-community/whisper-tiny-mlx"
+size_mb = 74
+languages = "99 languages, auto-detected"
+note = "fastest, lowest accuracy"
+
+[[model]]
+id = "whisper-base"
+type = "stt"
+engine = "mlx-whisper"
+repo = "mlx-community/whisper-base-mlx"
+size_mb = 144
+languages = "99 languages, auto-detected"
+note = "fast, fair accuracy"
+
+[[model]]
+id = "whisper-small"
+type = "stt"
+engine = "mlx-whisper"
+repo = "mlx-community/whisper-small-mlx"
+size_mb = 481
+languages = "99 languages, auto-detected"
+note = "balanced speed and accuracy"
+
+[[model]]
+id = "whisper-medium"
+type = "stt"
+engine = "mlx-whisper"
+repo = "mlx-community/whisper-medium-mlx"
+size_mb = 1525
+languages = "99 languages, auto-detected"
+note = "accurate, slower"
+
+[[model]]
+id = "whisper-large-v3-turbo"
+type = "stt"
+engine = "mlx-whisper"
+repo = "mlx-community/whisper-large-v3-turbo"
+size_mb = 1614
+languages = "99 languages, auto-detected"
+note = "recommended: near large-v3 accuracy, much faster"
+recommended = true
+
+[[model]]
+id = "whisper-large-v3"
+type = "stt"
+engine = "mlx-whisper"
+repo = "mlx-community/whisper-large-v3-mlx"
+size_mb = 3084
+languages = "99 languages, auto-detected"
+note = "most accurate, slowest"
+
+[[model]]
+id = "kokoro-82m"
+type = "tts"
+engine = "kokoro"
+repo = "mlx-community/Kokoro-82M-bf16"
+size_mb = 370
+languages = "English (US, UK), Spanish, French, Hindi, Italian, Brazilian Portuguese"
+note = "recommended TTS; best in English"
+recommended = true
+default_voice = "af_heart"
