@@ -106,7 +106,9 @@ class MLXWhisperEngine(STTEngine):
         quantization = config.pop("quantization", None)
         model = whisper.Model(whisper.ModelDimensions.from_dict(config), dtype=mx.float16)
 
-        weights_file = next(self.model_dir / w for w in WEIGHT_FILES if (self.model_dir / w).exists())
+        weights_file = next((self.model_dir / w for w in WEIGHT_FILES if (self.model_dir / w).exists()), None)
+        if weights_file is None:
+            raise FileNotFoundError(f"no Whisper weights in {self.model_dir}")
         weights = mx.load(str(weights_file))
         # mlx-whisper conversions store the alignment heads with the weights.
         heads = weights.pop("alignment_heads", None)

@@ -208,7 +208,7 @@ Catalog:
 | whisper-large-v3 | stt | ~3.1 GB | most accurate, slowest |
 | kokoro-82m | tts | ~370 MB | recommended TTS; best in English |
 
-Each id downloads the right files for your platform: MLX conversions on a Mac, faster-whisper (CTranslate2) and ONNX versions on Linux. The Kokoro download includes spaCy's small English pipeline (12 MB), which Kokoro uses for pronunciation on both. `hf:` repos must match the platform: MLX Whisper or mlx-audio TTS repos on a Mac (TTS other than Kokoro is best effort), CTranslate2 Whisper or Kokoro ONNX repos on Linux.
+Each id downloads the right files for your platform: MLX conversions on a Mac, faster-whisper (CTranslate2) and ONNX versions on Linux. The Kokoro download includes spaCy's small English pipeline (12 MB), which Kokoro uses for pronunciation on both. `hf:` repos must match the platform: MLX Whisper repos (`mlx-community/whisper-*-mlx`, or mlx-audio's `whisper-*-asr-*` conversions, quantized ones included) or mlx-audio TTS repos on a Mac (TTS other than Kokoro is best effort), CTranslate2 Whisper or Kokoro ONNX repos on Linux.
 
 ### Server
 
