@@ -110,3 +110,14 @@ def test_port_taken_by_another_program(cfg):
         blocker.listen()
         with pytest.raises(ServerError, match="already in use"):
             client.ensure_server(cfg)
+
+
+def test_start_command_returns_and_reuses_the_server(cfg, run_cli):
+    from vox.config import save_config
+
+    save_config(cfg)
+    first = run_cli("start")
+    assert first.code == 0 and f"127.0.0.1:{cfg.port}/v1" in first.err
+    pid = client.find_server().pid
+    assert run_cli("start").code == 0
+    assert client.find_server().pid == pid  # no second server

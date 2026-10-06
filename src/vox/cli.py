@@ -698,6 +698,20 @@ def models_info(model_id: Annotated[str, typer.Argument(metavar="ID")]) -> None:
 
 
 @app.command()
+def start() -> None:
+    """Start the server in the background and return, for apps that call the HTTP API.
+
+    Like the server transcribe and speak start, it exits after the idle timeout.
+    """
+    from vox import client
+
+    cfg = load_config()
+    info = client.ensure_server(cfg)
+    mode = "persistent" if info.persistent else f"exits after {format_duration(cfg.idle_timeout)} without requests"
+    ok(f"vox server running on http://127.0.0.1:{info.port}/v1 ({mode})")
+
+
+@app.command()
 def serve(
     persistent: Annotated[bool, typer.Option("--persistent", help="Never exit on idle (models still load lazily).")] = False,
     port: Annotated[Optional[int], typer.Option("--port", help="Port on 127.0.0.1 (default from config: 8880).")] = None,
@@ -706,10 +720,10 @@ def serve(
     ] = None,
     spawned: Annotated[bool, typer.Option("--spawned", hidden=True)] = False,
 ) -> None:
-    """Run the server in the foreground.
+    """Run the server in the foreground (for launchd, systemd or debugging).
 
-    You rarely need this: transcribe and speak start an on-demand server
-    that exits when idle. Use --persistent for an always-on server.
+    To start it in the background, use vox start. transcribe and speak start
+    it on their own. Use --persistent for an always-on server.
     """
     from vox import client
     from vox.config import parse_duration, parse_port

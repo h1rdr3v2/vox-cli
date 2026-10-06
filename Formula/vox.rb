@@ -7,6 +7,7 @@ class Vox < Formula
   url "https://github.com/h1rdr3v2/vox-cli.git",
       tag:      "v0.2.2",
       revision: "2d90f24cb05ca9fdbf8dae5417013f0e34d17541"
+  license "MIT"
   head "https://github.com/h1rdr3v2/vox-cli.git", branch: "main"
 
   depends_on "ffmpeg"

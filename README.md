@@ -2,8 +2,11 @@
 
 Local transcription and speech for Apple Silicon Macs and Linux.
 
+AI coding agents reinstall Whisper and torch in every project. vox is one local install with an OpenAI-compatible server they can all share, and the same commands work for you in the terminal and from a right-click in your file manager. Free meeting transcription; nothing leaves your computer.
+
 - **Transcribe**: audio or video in, text out (Whisper).
 - **Speak**: text in, audio out (Kokoro).
+- **Drop-in for OpenAI audio code**: change the base URL, keep `whisper-1`, `tts-1` and `voice="nova"`.
 
 | | Apple Silicon Mac | Linux (x86_64, arm64) |
 |---|---|---|
@@ -13,7 +16,7 @@ Local transcription and speech for Apple Silicon Macs and Linux.
 
 The commands, model names, settings and HTTP API are the same everywhere. Linux details: [docs/linux.md](docs/linux.md).
 
-Everything runs on your computer. vox installs no models: you pick the ones you want. It sends no telemetry, and it touches the network only when you download a model.
+vox installs no models: you pick the ones you want. It sends no telemetry, and it touches the network only when you download a model.
 
 **Memory:** vox starts a small background server only when a command needs it, loads only the model that command uses, and keeps it warm for back-to-back calls. After 5 idle minutes the server exits, so an idle vox uses zero memory.
 
@@ -84,6 +87,69 @@ vox models pull kokoro-82m
 
 In scripts (no terminal), vox does not prompt. It exits with code 2 and a hint such as `Run: vox models pull whisper-large-v3-turbo`.
 
+## Use it from apps and AI agents
+
+### Existing OpenAI audio code
+
+vox speaks OpenAI's audio API on `127.0.0.1:8880`, so code written for OpenAI works by changing one URL. Model and voice names vox does not have (`whisper-1`, `tts-1`, `nova`, `alloy`, ...) fall back to your default models and similar Kokoro voices.
+
+```bash
+vox start   # starts the server in the background; it exits after 5 idle minutes
+```
+
+```python
+from openai import OpenAI
+
+client = OpenAI(base_url="http://127.0.0.1:8880/v1", api_key="not-needed")
+
+with open("meeting.m4a", "rb") as f:
+    print(client.audio.transcriptions.create(model="whisper-1", file=f).text)
+
+client.audio.speech.create(model="tts-1", voice="nova", input="Good morning").write_to_file("morning.mp3")
+```
+
+Or with curl:
+
+```bash
+curl http://127.0.0.1:8880/v1/audio/transcriptions \
+  -F file=@meeting.m4a -F model=whisper-large-v3-turbo -F response_format=text
+```
+
+```bash
+curl http://127.0.0.1:8880/v1/audio/speech \
+  -H "Content-Type: application/json" \
+  -d '{"model": "kokoro-82m", "input": "Good morning", "voice": "af_heart", "response_format": "wav"}' \
+  -o morning.wav
+```
+
+| Endpoint | |
+|---|---|
+| `POST /v1/audio/transcriptions` | multipart `file`, `model`, optional `language`, `prompt`, `response_format` (`json`, `text`, `srt`, `vtt`, `verbose_json`) |
+| `POST /v1/audio/speech` | JSON `model`, `input`, `voice`, optional `speed`, `response_format` (`mp3` default, `wav`, `flac`, `opus`, `aac`, `pcm`) |
+| `GET /v1/models` | installed models |
+| `GET /health` | liveness |
+
+If `model` is missing or not an installed id (for example `whisper-1`), the default model of that type is used. If no model of that type is installed, the API returns 400. OpenAI voice names (`alloy`, `nova`, `onyx`, ...) map to similar Kokoro voices.
+
+The server listens on `127.0.0.1` only. For an always-on server, use `vox serve --persistent` (see [Server](#server)).
+
+### AI coding agents
+
+Coding agents don't know vox is installed, so they tend to `pip install` Whisper or a TTS package into each project. Add this to your agent's global instructions (`~/.claude/CLAUDE.md` for Claude Code, `~/.codex/AGENTS.md` for Codex; more in [docs/agents.md](docs/agents.md)):
+
+```markdown
+## Speech: use vox (installed on this computer)
+
+For speech-to-text or text-to-speech, prefer vox over installing Whisper, Kokoro, torch or similar packages:
+- Transcribe: `vox transcribe FILE --out -` prints the text (`--format srt|vtt|json` for timestamps).
+- Speak: `vox speak "text" --out speech.wav` (`vox voices` lists voices).
+- Installed models: `vox models list --installed`.
+- Code that needs an API: vox serves OpenAI's audio API at http://127.0.0.1:8880/v1 (any api_key).
+  Start the server first with `vox start` (it returns at once and stops after 5 idle minutes).
+
+vox is only on this computer: for apps other people will run, ask before depending on it.
+```
+
 ## Commands
 
 ### Transcribe
@@ -111,7 +177,7 @@ vox voices [--model ID]
 - Long text is split into sentence-sized chunks and the audio is joined, with a short pause between paragraphs.
 - `--speed` ranges from 0.5 to 2.0. `vox voices` lists the voices of the TTS model; Kokoro has 54 across American and British English, Spanish, French, Hindi, Italian, Brazilian Portuguese, Japanese and Mandarin. Voices can be blended: `--voice af_heart,af_bella`.
 
-Japanese and Mandarin voices need an extra text package: `uv tool install --reinstall . --with "misaki[ja]"` (or `misaki[zh]`).
+Japanese and Mandarin voices need an extra text package in vox's environment, for example `uv tool install --reinstall --with "misaki[ja]" git+https://github.com/h1rdr3v2/vox-cli` (or `misaki[zh]`).
 
 ### Models
 
@@ -148,11 +214,12 @@ Each id downloads the right files for your platform: MLX conversions on a Mac, f
 
 ```
 vox serve [--persistent] [--port 8880] [--idle-timeout 5m]
+vox start
 vox status
 vox stop
 ```
 
-You do not need to start anything: `transcribe` and `speak` start the server when needed. `vox status` shows whether it is running, its PID and port, the loaded models, its memory use (RSS) and the log path. `vox stop` shuts it down now.
+You do not need to start anything: `transcribe` and `speak` start the server when needed. `vox start` starts it in the background and returns, for apps that call the HTTP API; it still exits after the idle timeout. `vox status` shows whether it is running, its PID and port, the loaded models, its memory use (RSS) and the log path. `vox stop` shuts it down now.
 
 `vox serve` runs a server in the foreground. With `--persistent` it never exits on idle, but still loads models only when first used. To run it at login, see [docs/launchd.md](docs/launchd.md) (Mac) or the systemd section of [docs/linux.md](docs/linux.md).
 
@@ -174,44 +241,6 @@ Both setup commands add **Transcribe with vox** and **Speak with vox** to the ri
 The CLI is a thin client. `vox transcribe` and `vox speak` look for a running server (a state file plus a health check). If there is none, they start one in the background and wait for it. The server loads a model the first time a request needs it, so a transcription never loads Kokoro. Requests queue: the same model is never loaded twice. After `idle_timeout` seconds without requests (default 300), the server process exits and its memory goes back to the operating system. It does not try to unload models inside a long-lived process, because MLX and Python may not return freed memory.
 
 A cold start (process start plus model load) takes a few seconds. Later calls reuse the warm model.
-
-## HTTP API (OpenAI-compatible)
-
-The server listens on `127.0.0.1:8880` only and speaks OpenAI's audio API, so apps that support OpenAI can point their base URL at `http://127.0.0.1:8880/v1`. Start it with `vox serve` (or `vox serve --persistent`) when using it from other apps.
-
-| Endpoint | |
-|---|---|
-| `POST /v1/audio/transcriptions` | multipart `file`, `model`, optional `language`, `prompt`, `response_format` (`json`, `text`, `srt`, `vtt`, `verbose_json`) |
-| `POST /v1/audio/speech` | JSON `model`, `input`, `voice`, optional `speed`, `response_format` (`mp3` default, `wav`, `flac`, `opus`, `aac`, `pcm`) |
-| `GET /v1/models` | installed models |
-| `GET /health` | liveness |
-
-If `model` is missing or not an installed id (for example `whisper-1`), the default model of that type is used. If no model of that type is installed, the API returns 400. OpenAI voice names (`alloy`, `nova`, `onyx`, ...) map to similar Kokoro voices.
-
-```bash
-curl http://127.0.0.1:8880/v1/audio/transcriptions \
-  -F file=@meeting.m4a -F model=whisper-large-v3-turbo -F response_format=text
-```
-
-```bash
-curl http://127.0.0.1:8880/v1/audio/speech \
-  -H "Content-Type: application/json" \
-  -d '{"model": "kokoro-82m", "input": "Good morning", "voice": "af_heart", "response_format": "wav"}' \
-  -o morning.wav
-```
-
-With the OpenAI Python SDK:
-
-```python
-from openai import OpenAI
-
-client = OpenAI(base_url="http://127.0.0.1:8880/v1", api_key="not-needed")
-
-with open("meeting.m4a", "rb") as f:
-    print(client.audio.transcriptions.create(model="whisper-1", file=f).text)
-
-client.audio.speech.create(model="tts-1", voice="nova", input="Good morning").write_to_file("morning.mp3")
-```
 
 ## Files
 
@@ -249,28 +278,8 @@ Add `--debug` to any command for a full traceback. Exit codes: `0` success, `1` 
 
 ## Development
 
-```bash
-uv sync
-uv run pytest
-```
+See [docs/development.md](docs/development.md) for running the tests (including on Linux in Docker), the engine interfaces, and publishing a release.
 
-uv is only a convenience here; `python3 -m venv .venv && .venv/bin/pip install -e . pytest && .venv/bin/pytest` works too. The dev environment also installs the Linux engines, so on a Mac you can try them with `VOX_BACKEND=portable`.
+## License
 
-To run the suite on Linux from a Mac (needs Docker; arm64 by default, `--platform linux/amd64` for x86_64):
-
-```bash
-scripts/test-linux.sh
-```
-
-To publish a release (the Homebrew formula in `Formula/vox.rb` installs the tagged version):
-
-```bash
-scripts/release.sh 0.3.0
-git push origin main v0.3.0
-```
-
-Homebrew users then get it with `brew update && brew upgrade vox`. `brew install --HEAD h1rdr3v2/vox-cli/vox` builds from `main` instead.
-
-The tests use fake engines and temporary folders. `tests/test_integration.py` runs a real speak-then-transcribe round trip when an STT and a TTS model are installed (in `~/.cache/vox/models`, or the folder in `VOX_INTEGRATION_MODELS`).
-
-Engines live behind small interfaces (`STTEngine`, `TTSEngine` in `src/vox/engines/base.py`), so another backend such as whisper.cpp can be added without touching the CLI.
+MIT. See [LICENSE](LICENSE).
