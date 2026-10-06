@@ -40,6 +40,7 @@ def test_speak_then_transcribe(monkeypatch, tmp_path):
     from vox.config import Config
 
     monkeypatch.setenv("VOX_MODELS_DIR", str(MODELS))
+    monkeypatch.delenv("VOX_BACKEND", raising=False)  # this machine's real engines
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         port = s.getsockname()[1]

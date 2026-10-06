@@ -21,7 +21,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-from vox import paths
+from vox import paths, system
 from vox.catalog import CatalogEntry, load_catalog
 from vox.config import MODEL_TYPES, Config, load_config, save_config
 from vox.engines import engine_class
@@ -30,6 +30,11 @@ from vox.errors import MissingError, UserError
 
 MANIFEST = "vox-model.json"
 HF_PREFIX = "hf:"
+# Engine for hf:<org>/<repo> models. None: decided from the repo's config.json.
+HF_ENGINES = {
+    "mlx": {"stt": "mlx-whisper", "tts": None},
+    "portable": {"stt": "faster-whisper", "tts": "kokoro-onnx"},
+}
 
 
 @dataclass
@@ -158,7 +163,7 @@ def parse_ref(ref: str, model_type: str | None = None) -> ModelSpec:
             id=HF_PREFIX + repo,
             type=model_type,
             repo=repo,
-            engine="mlx-whisper" if model_type == "stt" else None,
+            engine=HF_ENGINES[system.backend()][model_type],
             from_catalog=False,
         )
     entry = load_catalog().get(ref)

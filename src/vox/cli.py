@@ -53,10 +53,11 @@ FORMAT_EXT = {"txt": ".txt", "srt": ".srt", "vtt": ".vtt", "json": ".json"}
 API_FORMAT = {"txt": "text", "srt": "srt", "vtt": "vtt", "json": "verbose_json"}
 AUDIO_EXT = {".wav": "wav", ".mp3": "mp3", ".flac": "flac", ".opus": "opus", ".ogg": "opus", ".aac": "aac", ".pcm": "pcm"}
 TEXT_SUFFIXES = (".txt", ".md", ".markdown", ".text")
+KOKORO_ENGINES = ("kokoro", "kokoro-onnx")
 
 app = typer.Typer(
     name="vox",
-    help="Local transcription (Whisper) and speech (Kokoro) for Apple Silicon Macs.",
+    help="Local transcription (Whisper) and speech (Kokoro) for Apple Silicon Macs and Linux.",
     no_args_is_help=True,
     add_completion=False,
     pretty_exceptions_enable=False,
@@ -446,12 +447,17 @@ def speak(
 
 
 def _play(path: Path) -> None:
-    proc = subprocess.Popen(["/usr/bin/afplay", str(path)])
+    from vox.system import audio_player, playback_error
+
+    proc = subprocess.Popen(audio_player(path), stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     try:
-        proc.wait()
+        _, stderr = proc.communicate()
     except KeyboardInterrupt:
         proc.terminate()
         raise
+    problem = playback_error(proc.returncode, stderr.decode(errors="replace"))
+    if problem:
+        raise UserError(problem, "Save the audio instead with --out speech.wav, or check your sound output.")
 
 
 @app.command()
@@ -459,7 +465,7 @@ def voices(
     model: Annotated[Optional[str], typer.Option("--model", "-m", help="TTS model id (default: your default TTS model).")] = None,
 ) -> None:
     """List the voices of a TTS model."""
-    from vox.engines.kokoro import describe_voice
+    from vox.engines.kokoro_text import describe_voice
 
     cfg = load_config()
     tts = require_model("tts", model, cfg)
@@ -472,7 +478,7 @@ def voices(
     for column in ("VOICE", "LANGUAGE", "GENDER", "DEFAULT"):
         table.add_column(column)
     for name in names:
-        language, gender = describe_voice(name) if tts.engine == "kokoro" else ("", "")
+        language, gender = describe_voice(name) if tts.engine in KOKORO_ENGINES else ("", "")
         table.add_row(name, language, gender, "*" if name == default else "")
     out.print(table)
     say(f"[dim]{len(names)} voices in {tts.id}. Use one with: vox speak \"Hello\" --voice {default or names[0]}[/dim]")
@@ -581,7 +587,7 @@ def models_default(model_id: Annotated[str, typer.Argument(metavar="ID")]) -> No
 @models_app.command("info")
 def models_info(model_id: Annotated[str, typer.Argument(metavar="ID")]) -> None:
     """Show a model's source, size, languages and voices."""
-    from vox.engines.kokoro import describe_voice
+    from vox.engines.kokoro_text import describe_voice
 
     cfg = load_config()
     model = models.get_installed(model_id)
@@ -615,7 +621,7 @@ def models_info(model_id: Annotated[str, typer.Argument(metavar="ID")]) -> None:
     if mtype == "tts":
         if model:
             names = model.voices()
-            if names and model.engine == "kokoro":
+            if names and model.engine in KOKORO_ENGINES:
                 grouped: dict[str, list[str]] = {}
                 for name in names:
                     grouped.setdefault(describe_voice(name)[0] or "Other", []).append(name)
@@ -746,7 +752,10 @@ def uninstall_cmd(
     for item in keep:
         say(f"[bold]Keeping[/bold] {escape(item.what)} in {escape(paths.pretty(item.path))} ({human_size(item.size)})")
     if not program:
-        say(f"[dim]The program itself runs from {escape(paths.pretty(sys.prefix))} (not a uv tool or pipx install), so it stays.[/dim]")
+        say(
+            f"[dim]The program itself (in {escape(paths.pretty(sys.prefix))}) was not installed with uv, pipx or Homebrew, so it stays."
+            " Remove it the way you installed it, for example: pip uninstall vox-cli[/dim]"
+        )
 
     if not yes:
         if not interactive():
@@ -758,6 +767,7 @@ def uninstall_cmd(
     from vox import finder
 
     had_finder = finder.helper_path().exists() or any(finder.workflow_path(a).exists() for a in finder.QUICK_ACTIONS)
+    had_finder = had_finder and sys.platform == "darwin"
     uninstall.remove_files(keep_models)
     for item in remove:
         ok(f"Removed {escape(item.what)}")
@@ -791,10 +801,12 @@ def setup_finder(
     print_only: Annotated[bool, typer.Option("--print-only", help="Only print the paths, change nothing.")] = False,
     uninstall: Annotated[bool, typer.Option("--uninstall", help="Remove the Quick Actions and the helper script.")] = False,
 ) -> None:
-    """Add "Transcribe with vox" and "Speak with vox" to Finder's Quick Actions."""
-    from vox import finder
+    """macOS: add "Transcribe with vox" and "Speak with vox" to Finder's Quick Actions."""
+    from vox import finder, system
     from vox.media import find_ffmpeg
 
+    if not system.is_mac():
+        raise UserError("vox setup finder is for the macOS Finder.", "On Linux use: vox setup files")
     if uninstall:
         removed = finder.remove_quick_actions()
         for path in removed:
@@ -834,6 +846,57 @@ def setup_finder(
     for action in finder.QUICK_ACTIONS:
         out.print(f"  {action.title}:  {finder.shell_command(action, helper)}")
     say("[dim]Full steps: docs/finder.md[/dim]")
+
+
+@setup_app.command("files")
+def setup_files(
+    print_only: Annotated[bool, typer.Option("--print-only", help="Only show what would be set up, change nothing.")] = False,
+    uninstall: Annotated[bool, typer.Option("--uninstall", help="Remove the right-click actions and the helper script.")] = False,
+) -> None:
+    """Linux: add "Transcribe with vox" and "Speak with vox" to your file manager's right-click menu.
+
+    Supports GNOME Files (Nautilus), Nemo, Caja and Dolphin.
+    """
+    from vox import desktop, finder, system
+    from vox.media import find_ffmpeg
+
+    if not system.is_linux():
+        raise UserError("vox setup files is for Linux file managers.", "On a Mac use: vox setup finder")
+    if uninstall:
+        removed = desktop.remove()
+        for path in removed:
+            ok(f"Removed {escape(paths.pretty(path))}")
+        if not removed:
+            say("No vox file-manager actions were installed.")
+        return
+
+    detected = desktop.detect()
+    table = Table(box=None, show_header=False, pad_edge=False)
+    table.add_column(style="bold")
+    table.add_column()
+    table.add_row("vox", " ".join(finder.vox_command()))
+    table.add_row("ffmpeg", find_ffmpeg() or f"[red]not found[/red] ({system.install_hint('ffmpeg')})")
+    table.add_row("found", ", ".join(desktop.FILE_MANAGERS[m] for m in detected) or "no supported file manager")
+    if print_only:
+        table.add_row("helper", f"{paths.pretty(desktop.helper_path())} (written by vox setup files)")
+        out.print(table)
+        return
+
+    helper = desktop.write_helper()
+    table.add_row("helper", str(helper))
+    out.print(table)
+    out.print()
+    if not detected:
+        say("No supported file manager was found (GNOME Files, Nemo, Caja, Dolphin).")
+        say("You can still call the helper from your own tools:")
+        out.print(f"  {helper} transcribe FILE...")
+        return
+    for path in desktop.install(detected, helper):
+        ok(f"Installed {escape(paths.pretty(path))}")
+    say(
+        "\nRight-click a file: GNOME Files and Caja list the actions under Scripts; Nemo and Dolphin show them"
+        " in the menu (Dolphin: Actions). Restart the file manager if they do not appear yet."
+    )
 
 
 # ---------------------------------------------------------------- config
@@ -914,6 +977,10 @@ _EXIT = tuple({click.exceptions.Exit, typer.Exit})
 
 
 def main() -> None:
+    if sys.platform == "win32":
+        err.print("[bold red]Error:[/bold red] vox does not run on Windows yet.")
+        err.print("  vox runs on Apple Silicon Macs and on Linux.")
+        sys.exit(2)
     try:
         result = app(standalone_mode=False)
     except _NO_ARGS_IS_HELP as exc:

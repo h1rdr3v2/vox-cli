@@ -1,4 +1,4 @@
-"""Speech-to-text with mlx-whisper."""
+"""Speech-to-text with mlx-whisper (Apple Silicon)."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import importlib
 import types
 from typing import TYPE_CHECKING
 
+from vox import languages
 from vox.engines.base import ProgressFn, Segment, STTEngine, Transcription, Word
 
 if TYPE_CHECKING:
@@ -67,19 +68,10 @@ class MLXWhisperEngine(STTEngine):
         self._model = load_model(str(self.model_dir), dtype=mx.float16)
 
     def normalize_language(self, language: str) -> str:
-        from mlx_whisper.tokenizer import LANGUAGES, TO_LANGUAGE_CODE
-
-        value = language.strip().lower()
-        if value in LANGUAGES:
-            return value
-        if value in TO_LANGUAGE_CODE:
-            return TO_LANGUAGE_CODE[value]
-        raise ValueError(f"unknown language '{language}'")
+        return languages.normalize(language)
 
     def language_name(self, code: str | None) -> str | None:
-        from mlx_whisper.tokenizer import LANGUAGES
-
-        return LANGUAGES.get(code or "")
+        return languages.LANGUAGES.get(code or "")
 
     def transcribe(
         self,

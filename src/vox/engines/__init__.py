@@ -10,6 +10,8 @@ _BUILTIN = {
     "mlx-whisper": ("vox.engines.mlx_whisper", "MLXWhisperEngine"),
     "kokoro": ("vox.engines.kokoro", "KokoroEngine"),
     "mlx-audio": ("vox.engines.mlx_audio_tts", "MLXAudioTTSEngine"),
+    "faster-whisper": ("vox.engines.faster_whisper", "FasterWhisperEngine"),
+    "kokoro-onnx": ("vox.engines.kokoro_onnx", "KokoroOnnxEngine"),
 }
 _registered: dict[str, type[Engine]] = {}
 

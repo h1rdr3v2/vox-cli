@@ -79,6 +79,8 @@ def vox_home(tmp_path, monkeypatch):
     monkeypatch.setenv("VOX_CONFIG_DIR", str(tmp_path / "config"))
     monkeypatch.setenv("VOX_CACHE_DIR", str(tmp_path / "cache"))
     monkeypatch.delenv("VOX_MODELS_DIR", raising=False)
+    # Same catalog on every machine running the tests; portable tests opt in.
+    monkeypatch.setenv("VOX_BACKEND", "mlx")
     monkeypatch.delenv("VOX_DEBUG", raising=False)
     engines.register("fake-stt", FakeSTT)
     engines.register("fake-tts", FakeTTS)

@@ -1,8 +1,8 @@
-"""vox: local transcription and speech for macOS."""
+"""vox: local transcription and speech for Apple Silicon Macs and Linux."""
 
 import os
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 # vox never sends telemetry. Model downloads are the only network traffic.
 os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")

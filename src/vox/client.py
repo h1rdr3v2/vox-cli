@@ -188,11 +188,10 @@ def stop_server(timeout: float = 10.0) -> ServerInfo | None:
 
 
 def _is_vox_process(pid: int) -> bool:
-    try:
-        out = subprocess.run(["ps", "-o", "command=", "-p", str(pid)], capture_output=True, text=True, timeout=5).stdout
-    except (OSError, subprocess.SubprocessError):
-        return False
-    return "vox" in out and "serve" in out
+    from vox.system import process_command
+
+    command = process_command(pid)
+    return "vox" in command and "serve" in command
 
 
 def _wait_exit(pid: int, timeout: float) -> bool:

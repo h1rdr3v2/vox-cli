@@ -20,7 +20,6 @@ import asyncio
 import contextlib
 import logging
 import os
-import subprocess
 import tempfile
 import time
 from collections.abc import Callable
@@ -105,11 +104,9 @@ def _resolve_voice(model: InstalledModel, requested: str | None) -> str | None:
 
 
 def _rss_bytes() -> int | None:
-    try:
-        out = subprocess.run(["ps", "-o", "rss=", "-p", str(os.getpid())], capture_output=True, text=True, timeout=5)
-        return int(out.stdout.strip()) * 1024
-    except (OSError, ValueError, subprocess.SubprocessError):
-        return None
+    from vox.system import rss_bytes
+
+    return rss_bytes(os.getpid())
 
 
 # ---------------------------------------------------------------- handlers

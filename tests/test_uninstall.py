@@ -16,6 +16,8 @@ def mac(tmp_path, monkeypatch):
     services = tmp_path / "Library" / "Services"
     monkeypatch.setattr(finder, "SERVICES_DIR", services)
     monkeypatch.setattr(finder, "PBS", "/nonexistent")
+    # Generating the workflow files works anywhere; only Automator's presence is checked.
+    monkeypatch.setattr(finder, "SHELL_ACTION", str(tmp_path))
     monkeypatch.setattr(uninstall, "launch_agent_path", lambda: tmp_path / "Library" / "LaunchAgents" / "local.vox.server.plist")
     monkeypatch.setattr(uninstall, "program_command", lambda: None)
     return tmp_path
@@ -34,7 +36,8 @@ def _setup_everything():
     return helper
 
 
-def test_setup_finder_uninstall_removes_actions_and_helper(run_cli, mac):
+def test_setup_finder_uninstall_removes_actions_and_helper(run_cli, mac, monkeypatch):
+    monkeypatch.setattr(sys, "platform", "darwin")
     helper = finder.write_helper()
     finder.install_quick_actions(helper)
     assert all(finder.workflow_path(a).exists() for a in finder.QUICK_ACTIONS)
@@ -100,6 +103,8 @@ def test_uninstall_with_nothing_installed(run_cli, mac):
     [
         ("/Users/me/.local/share/uv/tools/vox-cli", ["tool", "uninstall", "vox-cli"]),
         ("/Users/me/.local/pipx/venvs/vox-cli", ["uninstall", "vox-cli"]),
+        ("/opt/homebrew/Cellar/vox/0.2.0/libexec", ["uninstall", "vox"]),
+        ("/home/linuxbrew/.linuxbrew/Cellar/vox/0.2.0/libexec", ["uninstall", "vox"]),
         ("/Users/me/code/vox-cli/.venv", None),
     ],
 )
@@ -108,4 +113,4 @@ def test_program_command(monkeypatch, prefix, expected):
     command = uninstall.program_command()
     assert (command[1:] if command else None) == expected
     if command:
-        assert Path(command[0]).name in ("uv", "pipx")
+        assert Path(command[0]).name in ("uv", "pipx", "brew")

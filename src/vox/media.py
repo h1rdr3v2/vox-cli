@@ -10,9 +10,9 @@ from pathlib import Path
 
 from vox.errors import MissingError, UserError
 
-# Shortcuts and Finder Quick Actions run with a minimal PATH, so look in
-# the usual Homebrew locations too.
-FFMPEG_CANDIDATES = ("/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg")
+# Shortcuts, Quick Actions and file-manager scripts run with a minimal PATH,
+# so look in the usual Homebrew and Linux locations too.
+FFMPEG_CANDIDATES = ("/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg", "/home/linuxbrew/.linuxbrew/bin/ffmpeg", "/usr/bin/ffmpeg")
 
 
 def find_ffmpeg() -> str | None:
@@ -28,7 +28,9 @@ def find_ffmpeg() -> str | None:
 def require_ffmpeg() -> str:
     path = find_ffmpeg()
     if not path:
-        raise MissingError("ffmpeg is not installed.", "Run: brew install ffmpeg")
+        from vox.system import install_hint
+
+        raise MissingError("ffmpeg is not installed.", install_hint("ffmpeg"))
     return path
 
 

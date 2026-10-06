@@ -3,7 +3,7 @@
 import pytest
 from conftest import install_fake
 
-from vox import cli, models
+from vox import cli, models, system
 from vox.config import load_config
 
 
@@ -91,7 +91,8 @@ def test_missing_ffmpeg_exits_2(run_cli, tmp_path, monkeypatch):
     clip.write_bytes(b"x")
     result = run_cli("transcribe", str(clip))
     assert result.code == 2
-    assert "brew install ffmpeg" in result.err
+    assert "ffmpeg is not installed." in result.err
+    assert system.install_hint("ffmpeg") in result.err
 
 
 def test_transcript_target(tmp_path):

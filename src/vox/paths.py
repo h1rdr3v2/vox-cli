@@ -1,24 +1,32 @@
 """Where vox keeps its files.
 
 Config lives in ~/.config/vox, models and runtime files in ~/.cache/vox.
-VOX_CONFIG_DIR, VOX_CACHE_DIR and VOX_MODELS_DIR override these (used by
-the tests).
+On Linux, XDG_CONFIG_HOME and XDG_CACHE_HOME move those base folders.
+VOX_CONFIG_DIR, VOX_CACHE_DIR and VOX_MODELS_DIR override everything (used
+by the tests).
 """
 
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
+
+
+def _xdg(variable: str, default: str) -> Path:
+    value = os.environ.get(variable, "") if sys.platform.startswith("linux") else ""
+    # The XDG spec says to ignore relative paths.
+    return Path(value) if value and os.path.isabs(value) else Path.home() / default
 
 
 def config_dir() -> Path:
     override = os.environ.get("VOX_CONFIG_DIR")
-    return Path(override) if override else Path.home() / ".config" / "vox"
+    return Path(override) if override else _xdg("XDG_CONFIG_HOME", ".config") / "vox"
 
 
 def cache_dir() -> Path:
     override = os.environ.get("VOX_CACHE_DIR")
-    return Path(override) if override else Path.home() / ".cache" / "vox"
+    return Path(override) if override else _xdg("XDG_CACHE_HOME", ".cache") / "vox"
 
 
 def config_file() -> Path:

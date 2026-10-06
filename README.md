@@ -1,30 +1,50 @@
 # vox
 
-Local transcription and speech for Apple Silicon Macs.
+Local transcription and speech for Apple Silicon Macs and Linux.
 
-- **Transcribe**: audio or video in, text out (Whisper, via `mlx-whisper`).
-- **Speak**: text in, audio out (Kokoro, via `mlx-audio`).
+- **Transcribe**: audio or video in, text out (Whisper).
+- **Speak**: text in, audio out (Kokoro).
 
-Everything runs on your Mac. vox installs no models: you pick the ones you want. It sends no telemetry, and it touches the network only when you download a model.
+| | Apple Silicon Mac | Linux (x86_64, arm64) |
+|---|---|---|
+| Transcription | `mlx-whisper` (GPU via Metal) | `faster-whisper` (CPU, or NVIDIA GPU) |
+| Speech | Kokoro on `mlx-audio` | Kokoro on ONNX Runtime |
+| Right-click menu | Finder Quick Actions | GNOME Files, Nemo, Caja, Dolphin |
+
+The commands, model names, settings and HTTP API are the same everywhere. Linux details: [docs/linux.md](docs/linux.md).
+
+Everything runs on your computer. vox installs no models: you pick the ones you want. It sends no telemetry, and it touches the network only when you download a model.
 
 **Memory:** vox starts a small background server only when a command needs it, loads only the model that command uses, and keeps it warm for back-to-back calls. After 5 idle minutes the server exits, so an idle vox uses zero memory.
 
 ## Install
 
-Requirements: macOS 14 or later on Apple Silicon, [uv](https://docs.astral.sh/uv/), and ffmpeg.
+Requirements: macOS 14 or later on Apple Silicon, or Linux on x86_64 or arm64; Python 3.11 or later; ffmpeg.
+
+With Homebrew (Mac or Linux), which also installs Python and ffmpeg:
+
+```bash
+brew tap h1rdr3v2/vox-cli https://github.com/h1rdr3v2/vox-cli
+brew install h1rdr3v2/vox-cli/vox
+```
+
+Or with uv on a Mac:
 
 ```bash
 brew install uv ffmpeg
+uv tool install --compile-bytecode git+https://github.com/h1rdr3v2/vox-cli
 ```
+
+Or with pipx on Linux (Debian or Ubuntu shown; use your package manager):
 
 ```bash
-git clone <this repo> vox-cli && cd vox-cli
-uv tool install --compile-bytecode .
+sudo apt install ffmpeg pipx git
+pipx install git+https://github.com/h1rdr3v2/vox-cli
 ```
 
-That puts `vox` on your PATH (in `~/.local/bin`). If your shell cannot find it, run `uv tool update-shell` and open a new terminal. `pipx install .` works too. To remove vox and everything it created, run `vox uninstall` (see [Uninstall](#uninstall)).
+With uv or pipx, `vox` lands on your PATH (in `~/.local/bin`). If your shell cannot find it, run `uv tool update-shell` (or `pipx ensurepath`) and open a new terminal. uv and pipx are interchangeable here; plain `pip install` into a virtual environment also works. To remove vox and everything it created, run `vox uninstall` (see [Uninstall](#uninstall)).
 
-The very first transcription or speech after installing can take up to a minute while macOS checks the newly installed libraries (MLX, torch, spaCy) once. After that, a cold start takes a few seconds.
+The very first transcription or speech after installing on a Mac can take up to a minute while macOS checks the newly installed libraries (MLX, torch, spaCy) once. After that, a cold start takes a few seconds.
 
 The PyPI distribution name is `vox-cli`. The command is `vox`.
 
@@ -86,7 +106,7 @@ vox voices [--model ID]
 
 - Input is a literal string, a `.txt` or `.md` file (Markdown syntax is stripped), or `-` for stdin.
 - Output: `notes.txt` gives `notes.wav` next to it; literal text gives `speech.wav` in the current folder. `--out file.mp3` writes MP3 (via ffmpeg); `.flac`, `.opus` and `.aac` work too. `--out -` writes WAV to stdout.
-- `--play` plays the result with `afplay`. With `--play` and no `--out`, nothing is saved.
+- `--play` plays the result (with `afplay` on a Mac; `pw-play`, `paplay`, `ffplay` or `aplay` on Linux). With `--play` and no `--out`, nothing is saved.
 - Long text is split into sentence-sized chunks and the audio is joined, with a short pause between paragraphs.
 - `--speed` ranges from 0.5 to 2.0. `vox voices` lists the voices of the TTS model; Kokoro has 54 across American and British English, Spanish, French, Hindi, Italian, Brazilian Portuguese, Japanese and Mandarin. Voices can be blended: `--voice af_heart,af_bella`.
 
@@ -97,7 +117,7 @@ Japanese and Mandarin voices need an extra text package: `uv tool install --rein
 ```
 vox models list [--installed | --available] [--type stt|tts]
 vox models pull <id>                       # catalog id
-vox models pull hf:<org>/<repo> --type stt|tts   # any MLX model on Hugging Face
+vox models pull hf:<org>/<repo> --type stt|tts   # any compatible model on Hugging Face
 vox models rm <id>
 vox models default <id>
 vox models info <id>
@@ -121,7 +141,7 @@ Catalog:
 | whisper-large-v3 | stt | ~3.1 GB | most accurate, slowest |
 | kokoro-82m | tts | ~370 MB | recommended TTS; best in English |
 
-The Kokoro download includes spaCy's small English pipeline (12 MB), which Kokoro uses for pronunciation. `hf:` TTS repos other than Kokoro are run with mlx-audio on a best-effort basis.
+Each id downloads the right files for your platform: MLX conversions on a Mac, faster-whisper (CTranslate2) and ONNX versions on Linux. The Kokoro download includes spaCy's small English pipeline (12 MB), which Kokoro uses for pronunciation on both. `hf:` repos must match the platform: MLX Whisper or mlx-audio TTS repos on a Mac (TTS other than Kokoro is best effort), CTranslate2 Whisper or Kokoro ONNX repos on Linux.
 
 ### Server
 
@@ -133,23 +153,24 @@ vox stop
 
 You do not need to start anything: `transcribe` and `speak` start the server when needed. `vox status` shows whether it is running, its PID and port, the loaded models, its memory use (RSS) and the log path. `vox stop` shuts it down now.
 
-`vox serve` runs a server in the foreground. With `--persistent` it never exits on idle, but still loads models only when first used. See [docs/launchd.md](docs/launchd.md) to run it at login.
+`vox serve` runs a server in the foreground. With `--persistent` it never exits on idle, but still loads models only when first used. To run it at login, see [docs/launchd.md](docs/launchd.md) (Mac) or the systemd section of [docs/linux.md](docs/linux.md).
 
-### Settings and Finder
+### Settings and right-click actions
 
 ```
 vox config                      # show settings
-vox config set KEY VALUE        # default_voice, idle_timeout, port, default_format, ...
-vox setup finder                # add Finder Quick Actions
-vox setup finder --uninstall    # remove them again
+vox config set KEY VALUE        # default_voice, idle_timeout, port, default_format, device, ...
+vox setup finder                # Mac: add Finder Quick Actions
+vox setup files                 # Linux: add file-manager actions
+vox setup finder --uninstall    # remove them again (or: vox setup files --uninstall)
 vox uninstall [--keep-models]   # remove vox completely
 ```
 
-`vox setup finder` adds **Transcribe with vox** and **Speak with vox** to Finder's right-click menu. See [docs/finder.md](docs/finder.md).
+Both setup commands add **Transcribe with vox** and **Speak with vox** to the right-click menu. See [docs/finder.md](docs/finder.md) for the Mac and [docs/linux.md](docs/linux.md) for Linux. On Linux, `device` picks `auto` (an NVIDIA GPU when usable), `cpu` or `cuda`.
 
 ## How the memory behavior works
 
-The CLI is a thin client. `vox transcribe` and `vox speak` look for a running server (a state file plus a health check). If there is none, they start one in the background and wait for it. The server loads a model the first time a request needs it, so a transcription never loads Kokoro. Requests queue: the same model is never loaded twice. After `idle_timeout` seconds without requests (default 300), the server process exits and its memory goes back to macOS. It does not try to unload models inside a long-lived process, because MLX and Python may not return freed memory.
+The CLI is a thin client. `vox transcribe` and `vox speak` look for a running server (a state file plus a health check). If there is none, they start one in the background and wait for it. The server loads a model the first time a request needs it, so a transcription never loads Kokoro. Requests queue: the same model is never loaded twice. After `idle_timeout` seconds without requests (default 300), the server process exits and its memory goes back to the operating system. It does not try to unload models inside a long-lived process, because MLX and Python may not return freed memory.
 
 A cold start (process start plus model load) takes a few seconds. Later calls reuse the warm model.
 
@@ -199,6 +220,8 @@ client.audio.speech.create(model="tts-1", voice="nova", input="Good morning").wr
 | Models | `~/.cache/vox/models/<id>/` (each with a `vox-model.json` manifest) |
 | Server state, lock and log | `~/.cache/vox/run/` (`server.log`) |
 
+On Linux, `XDG_CONFIG_HOME` and `XDG_CACHE_HOME` move these folders as usual.
+
 ## Uninstall
 
 ```bash
@@ -206,15 +229,15 @@ vox uninstall                 # asks first, then removes everything
 vox uninstall --keep-models   # same, but leaves ~/.cache/vox/models for a later reinstall
 ```
 
-It lists what it will remove, then: stops the server, removes the Finder Quick Actions and their helper, the launch agent from [docs/launchd.md](docs/launchd.md) if you made one, `~/.config/vox`, the server logs, the models (unless `--keep-models`), and finally the program itself (`uv tool uninstall vox-cli`, or `pipx uninstall vox-cli`). Add `--yes` to skip the question in scripts. Shortcuts you built by hand in the Shortcuts app are not touched.
+It lists what it will remove, then: stops the server, removes the right-click actions (Finder or Linux file managers) and their helper, the launch agent or systemd user service from the docs if you made one, `~/.config/vox`, the server logs, the models (unless `--keep-models`), and finally the program itself (`brew uninstall vox`, `uv tool uninstall vox-cli` or `pipx uninstall vox-cli`, matching how you installed it). Add `--yes` to skip the question in scripts. Shortcuts you built by hand in the Shortcuts app are not touched. If you installed vox another way (for example plain pip), it says so and leaves the program for you to remove the same way.
 
-To remove only the Finder integration: `vox setup finder --uninstall`.
+To remove only the right-click actions: `vox setup finder --uninstall` (Mac) or `vox setup files --uninstall` (Linux).
 
-If you reinstall after `--keep-models`, vox finds the kept models again. `uv tool uninstall vox-cli` on its own removes only the program and leaves settings and models in place.
+If you reinstall after `--keep-models`, vox finds the kept models again. `brew uninstall vox` or `uv tool uninstall vox-cli` on its own removes only the program and leaves settings and models in place.
 
 ## Errors and exit codes
 
-Errors are one line plus a hint, for example:
+Errors are one line plus a hint, for example (on a Mac):
 
 ```
 Error: ffmpeg is not installed.
@@ -229,6 +252,23 @@ Add `--debug` to any command for a full traceback. Exit codes: `0` success, `1` 
 uv sync
 uv run pytest
 ```
+
+uv is only a convenience here; `python3 -m venv .venv && .venv/bin/pip install -e . pytest && .venv/bin/pytest` works too. The dev environment also installs the Linux engines, so on a Mac you can try them with `VOX_BACKEND=portable`.
+
+To run the suite on Linux from a Mac (needs Docker; arm64 by default, `--platform linux/amd64` for x86_64):
+
+```bash
+scripts/test-linux.sh
+```
+
+To publish a release (the Homebrew formula in `Formula/vox.rb` installs the tagged version):
+
+```bash
+scripts/release.sh 0.3.0
+git push origin main v0.3.0
+```
+
+Homebrew users then get it with `brew update && brew upgrade vox`. `brew install --HEAD h1rdr3v2/vox-cli/vox` builds from `main` instead.
 
 The tests use fake engines and temporary folders. `tests/test_integration.py` runs a real speak-then-transcribe round trip when an STT and a TTS model are installed (in `~/.cache/vox/models`, or the folder in `VOX_INTEGRATION_MODELS`).
 

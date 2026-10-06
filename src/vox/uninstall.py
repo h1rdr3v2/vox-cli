@@ -14,13 +14,20 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from vox import finder, models, paths
+from vox import desktop, finder, models, paths
 
 LAUNCH_AGENT_LABEL = "local.vox.server"  # the label docs/launchd.md uses
+SYSTEMD_UNIT = "vox.service"  # the unit name docs/linux.md uses
 
 
 def launch_agent_path() -> Path:
     return Path.home() / "Library" / "LaunchAgents" / f"{LAUNCH_AGENT_LABEL}.plist"
+
+
+def systemd_unit_path() -> Path:
+    base = os.environ.get("XDG_CONFIG_HOME", "")
+    root = Path(base) if os.path.isabs(base) else Path.home() / ".config"
+    return root / "systemd" / "user" / SYSTEMD_UNIT
 
 
 @dataclass
@@ -46,7 +53,8 @@ def _model_name(folder: Path) -> str:
 
 
 def program_command() -> list[str] | None:
-    """The command that removes the vox program, based on how it was installed.
+    """The command that removes the vox program, based on how it was installed
+    (uv tool, pipx or Homebrew).
 
     None when vox runs from somewhere else (for example a development checkout).
     """
@@ -60,6 +68,9 @@ def program_command() -> list[str] | None:
         return [uv, "tool", "uninstall", prefix.name]
     if len(parts) >= 3 and parts[-2] == "venvs" and any("pipx" in p for p in parts):  # ~/.local/pipx/venvs/vox-cli
         return [shutil.which("pipx") or "pipx", "uninstall", prefix.name]
+    if len(parts) >= 5 and parts[-4] == "Cellar" and parts[-1] == "libexec":  # <brew>/Cellar/vox/0.2.0/libexec
+        brew = prefix.parents[3] / "bin" / "brew"
+        return [str(brew) if brew.exists() else (shutil.which("brew") or "brew"), "uninstall", parts[-3]]
     return None
 
 
@@ -69,11 +80,16 @@ def plan(keep_models: bool) -> tuple[list[Item], list[Item]]:
     keep: list[Item] = []
     if launch_agent_path().exists():
         remove.append(Item("Launch agent (always-on server)", launch_agent_path()))
+    if systemd_unit_path().exists():
+        remove.append(Item("systemd user service (always-on server)", systemd_unit_path()))
     for action in finder.QUICK_ACTIONS:
         if finder.workflow_path(action).exists():
             remove.append(Item(f'Finder Quick Action "{action.title}"', finder.workflow_path(action)))
+    for path in desktop.installed():
+        if path != desktop.helper_path():  # the helper goes with the settings folder
+            remove.append(Item("File-manager action", path))
     if paths.config_dir().exists():
-        remove.append(Item("Settings and Finder helper", paths.config_dir(), models.dir_size(paths.config_dir())))
+        remove.append(Item("Settings and helper scripts", paths.config_dir(), models.dir_size(paths.config_dir())))
 
     folders = _model_folders()
     if folders:
@@ -93,11 +109,19 @@ def remove_files(keep_models: bool) -> None:
 
     agent = launch_agent_path()
     if agent.exists():
-        subprocess.run(["launchctl", "bootout", f"gui/{os.getuid()}/{LAUNCH_AGENT_LABEL}"], capture_output=True)
+        launchctl = shutil.which("launchctl")
+        if launchctl:
+            subprocess.run([launchctl, "bootout", f"gui/{os.getuid()}/{LAUNCH_AGENT_LABEL}"], capture_output=True)
         agent.unlink()
+    unit = systemd_unit_path()
+    if unit.exists():
+        _systemctl("disable", "--now", SYSTEMD_UNIT)
+        unit.unlink()
+        _systemctl("daemon-reload")
     client.stop_server()
 
     finder.remove_quick_actions()
+    desktop.remove()
     shutil.rmtree(paths.config_dir(), ignore_errors=True)
     if not keep_models:
         for folder in _model_folders():
@@ -107,6 +131,12 @@ def remove_files(keep_models: bool) -> None:
     for link in _espeak_links():
         link.unlink(missing_ok=True)
     _rmdir_if_empty(paths.cache_dir())
+
+
+def _systemctl(*args: str) -> None:
+    systemctl = shutil.which("systemctl")
+    if systemctl:
+        subprocess.run([systemctl, "--user", *args], capture_output=True)
 
 
 def _rmdir_if_empty(path: Path) -> None:

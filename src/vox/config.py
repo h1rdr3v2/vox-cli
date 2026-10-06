@@ -15,11 +15,13 @@ from vox import paths
 from vox.errors import UserError
 
 FORMATS = ("txt", "srt", "vtt", "json")
+DEVICES = ("auto", "cpu", "cuda")
 MODEL_TYPES = ("stt", "tts")
 
 DEFAULT_PORT = 8880
 DEFAULT_IDLE_TIMEOUT = 300  # seconds
 DEFAULT_FORMAT = "txt"
+DEFAULT_DEVICE = "auto"
 
 # Keys `vox config set` understands, with a short description each.
 KEYS = {
@@ -29,6 +31,7 @@ KEYS = {
     "port": "server port (127.0.0.1 only)",
     "idle_timeout": "seconds of inactivity before the server exits (also 30s, 5m, 1h)",
     "default_format": "default transcript format: txt, srt, vtt or json",
+    "device": "Linux: auto (NVIDIA GPU if usable), cpu or cuda",
 }
 
 
@@ -40,6 +43,7 @@ class Config:
     port: int = DEFAULT_PORT
     idle_timeout: int = DEFAULT_IDLE_TIMEOUT
     default_format: str = DEFAULT_FORMAT
+    device: str = DEFAULT_DEVICE
     extra: dict[str, Any] = field(default_factory=dict)
 
     def default_for(self, model_type: str) -> str | None:
@@ -85,6 +89,13 @@ def parse_format(value: Any, key: str = "default_format") -> str:
     return fmt
 
 
+def parse_device(value: Any, key: str = "device") -> str:
+    device = str(value).lower()
+    if device not in DEVICES:
+        raise _invalid(key, value)
+    return device
+
+
 def _invalid(key: str, value: Any) -> UserError:
     return UserError(
         f"Invalid value for {key} in {paths.pretty(paths.config_file())}: {value!r}.",
@@ -121,6 +132,8 @@ def load_config(path: Path | None = None) -> Config:
         cfg.idle_timeout = parse_duration(data.pop("idle_timeout"))
     if "default_format" in data:
         cfg.default_format = parse_format(data.pop("default_format"))
+    if "device" in data:
+        cfg.device = parse_device(data.pop("device"))
     cfg.extra = data
     return cfg
 
@@ -147,6 +160,7 @@ def dumps(cfg: Config) -> str:
         "port": cfg.port,
         "idle_timeout": cfg.idle_timeout,
         "default_format": cfg.default_format,
+        "device": cfg.device,
     }
     tables = {}
     for key, value in cfg.extra.items():
@@ -190,3 +204,5 @@ def set_value(cfg: Config, key: str, value: str | None) -> None:
         cfg.idle_timeout = DEFAULT_IDLE_TIMEOUT if value is None else parse_duration(value)
     elif key == "default_format":
         cfg.default_format = DEFAULT_FORMAT if value is None else parse_format(value)
+    elif key == "device":
+        cfg.device = DEFAULT_DEVICE if value is None else parse_device(value)
