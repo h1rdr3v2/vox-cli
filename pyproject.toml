@@ -1,6 +1,6 @@
 [project]
 name = "vox-cli"
-version = "0.2.1"
+version = "0.2.2"
 description = "Local transcription (Whisper) and speech (Kokoro) for Apple Silicon Macs and Linux. No cloud, no idle memory."
 readme = "README.md"
 authors = [{ name = "Destiny Ezenwata" }]
