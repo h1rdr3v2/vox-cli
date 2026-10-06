@@ -5,8 +5,8 @@ class Vox < Formula
   desc "Local transcription (Whisper) and speech (Kokoro) with zero idle memory"
   homepage "https://github.com/h1rdr3v2/vox-cli"
   url "https://github.com/h1rdr3v2/vox-cli.git",
-      tag:      "v0.2.0",
-      revision: "5e426ac50bdb204f2922e3f8b33dd86d026ef181"
+      tag:      "v0.2.1",
+      revision: "84ac977cf40508585eb325dd0d37675d54b58db2"
   head "https://github.com/h1rdr3v2/vox-cli.git", branch: "main"
 
   depends_on "ffmpeg"
