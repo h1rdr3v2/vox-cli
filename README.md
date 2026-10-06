@@ -96,6 +96,7 @@ vox transcribe <file...> [--model ID] [--format txt|srt|vtt|json] [--language CO
 - Output goes next to the input with the same name: `clip.mp4` gives `clip.txt`. `--out -` prints to stdout. With several files, `--out` must be a folder.
 - `--format json` writes segments with timestamps, the detected language and the duration. If you omit `--format`, an `--out` ending in `.srt`, `.vtt` or `.json` picks the format; otherwise the `default_format` setting (txt) applies.
 - The language is detected automatically unless you pass `--language` (`en`, `fr`, `german`, ...).
+- `--progress-file PATH` keeps PATH updated with how far the job is, from `0` to `1`, for scripts and other apps (`vox speak` has it too).
 
 ### Speak
 

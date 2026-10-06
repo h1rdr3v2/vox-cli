@@ -2,8 +2,10 @@
 
 Two right-click actions for Finder:
 
-- **Transcribe with vox**: for audio and video files. Runs `vox transcribe` on each file, writes a `.txt` next to it, and shows a notification when done.
+- **Transcribe with vox**: for audio and video files. Runs `vox transcribe` on each file and writes a `.txt` next to it.
 - **Speak with vox**: for `.txt` and `.md` files. Runs `vox speak` on each file and writes a `.wav` next to it.
+
+Both show a notification when they start ("Transcribing interview.m4a") and when they finish ("Saved interview.txt", or what went wrong). While they run, the gear in the menu bar shows real progress in 10% steps; click its ✕ to cancel.
 
 Both call a small helper script, `~/.config/vox/finder/vox-finder.sh`. Quick Actions and Shortcuts run with a minimal PATH, so the helper uses the absolute paths of `vox` and `ffmpeg`, found when you run `vox setup finder`.
 
@@ -75,7 +77,9 @@ vox-finder.sh transcribe FILE...    # FILE.txt next to each file
 vox-finder.sh speak FILE...         # FILE.wav next to each file
 ```
 
-It runs vox once per file with stdin closed, so vox never stops to ask a question. When all files succeed you get a notification such as "Saved interview.txt". If something fails, the notification shows the file and vox's error with its hint, for example: `No STT model installed. Run: vox models pull whisper-large-v3-turbo`.
+It runs vox once per file with stdin closed, so vox never stops to ask a question, and notifies you when it starts and when it finishes, for example "Saved interview.txt".
+
+macOS shows a Quick Action's progress by counting its finished steps, and ignores progress reported from inside a step. So the generated Quick Actions have ten steps: `vox-finder.sh step 1 transcribe FILE...` starts the job in the background, and steps 2 to 10 (`vox-finder.sh step N JOB`) each return once the next tenth of the work is done. vox reports how far it is through `--progress-file`. Shortcuts run the one-step form above, so they show no percentage. If something fails, the notification shows the file and vox's error with its hint, for example: `No STT model installed. Run: vox models pull whisper-large-v3-turbo`.
 
 You can call the helper from anywhere, for example Folder Actions or a Hazel rule.
 

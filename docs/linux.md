@@ -56,7 +56,7 @@ This adds **Transcribe with vox** (audio and video) and **Speak with vox** (text
 | Nemo (Cinnamon) | right-click menu | `~/.local/share/nemo/actions/` |
 | Dolphin (KDE) | right-click > Actions | `~/.local/share/kio/servicemenus/` |
 
-Each action calls a helper script, `~/.config/vox/files/vox-files.sh`, which runs vox on every selected file, writes the result next to it, and shows a desktop notification (`notify-send`) when done. Restart the file manager if the actions do not show up right away (`nautilus -q`, or log out and back in).
+Each action calls a helper script, `~/.config/vox/files/vox-files.sh`, which runs vox on every selected file, writes the result next to it, and shows a desktop notification (`notify-send`) when it starts and when it is done. Restart the file manager if the actions do not show up right away (`nautilus -q`, or log out and back in).
 
 Install the models first; actions cannot show the interactive model picker. To remove the actions: `vox setup files --uninstall`. To see what would be set up: `vox setup files --print-only`.
 

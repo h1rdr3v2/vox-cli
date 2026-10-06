@@ -6,6 +6,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import traceback
 from pathlib import Path
@@ -229,7 +230,47 @@ def _progress() -> Progress:
     )
 
 
-def _job_updater(progress: Progress, task, model_id: str, working: str):
+class ProgressFile:
+    """Keeps a file updated with the fraction of the work done, 0 to 1.
+
+    For scripts and the Finder Quick Actions, which read it to show progress.
+    Each write replaces the file whole, so a reader never sees half a number.
+    """
+
+    def __init__(self, path: Path | None, parts: int = 1):
+        self.path = path
+        self.parts = max(parts, 1)
+        self.part = 0
+        self._last = -1.0
+        self._lock = threading.Lock()
+        self.update(0.0)
+
+    def start_part(self, index: int) -> None:
+        self.part = index
+        self.update(0.0)
+
+    def update(self, fraction: float) -> None:
+        """Progress within the current part (one file of several)."""
+        if self.path is None:
+            return
+        value = min(1.0, (self.part + min(max(fraction, 0.0), 1.0)) / self.parts)
+        with self._lock:
+            if 0.0 < value < 1.0 and abs(value - self._last) < 0.002:
+                return
+            self._last = value
+            tmp = self.path.with_name(f".{self.path.name}.tmp")
+            try:
+                tmp.write_text(f"{value:.4f}\n", encoding="utf-8")
+                os.replace(tmp, self.path)
+            except OSError:
+                pass  # progress is a convenience; never fail the job over it
+
+    def finish(self) -> None:
+        self.part = self.parts
+        self.update(0.0)
+
+
+def _job_updater(progress: Progress, task, model_id: str, working: str, report: ProgressFile | None = None):
     def on_job(job: dict) -> None:
         state = job.get("state")
         if state == "queued":
@@ -239,6 +280,8 @@ def _job_updater(progress: Progress, task, model_id: str, working: str):
         elif state == "running":
             total = job.get("total") or None
             progress.update(task, description=working, total=total, completed=job.get("done", 0))
+            if report and total:
+                report.update(job.get("done", 0) / total)
 
     return on_job
 
@@ -272,6 +315,9 @@ def transcribe(
     out_opt: Annotated[
         Optional[str], typer.Option("--out", "-o", help="Output file or folder. Use - for stdout. Default: next to the input.")
     ] = None,
+    progress_file: Annotated[
+        Optional[Path], typer.Option("--progress-file", help="Keep this file updated with the progress (0 to 1), for scripts.")
+    ] = None,
 ) -> None:
     """Transcribe audio or video to text."""
     cfg = load_config()
@@ -292,12 +338,14 @@ def transcribe(
     stt = require_model("stt", model, cfg)
 
     failures = 0
+    report = ProgressFile(progress_file, parts=len(files))
     with _progress() as progress:
         task = progress.add_task("Connecting to vox", total=None)
         client = connect(cfg, progress, task)
         for index, src in enumerate(files, start=1):
             prefix = f"[{index}/{len(files)}] " if many else ""
             started = time.monotonic()
+            report.start_part(index - 1)
             try:
                 target = _transcript_target(src, fmt, out_opt, many)
                 progress.update(task, description=f"{prefix}Converting {src.name}", total=None, completed=0)
@@ -311,7 +359,7 @@ def transcribe(
                         model=stt.id,
                         response_format=API_FORMAT[fmt],
                         language=language,
-                        on_job=_job_updater(progress, task, stt.id, working),
+                        on_job=_job_updater(progress, task, stt.id, working, report),
                     )
                 text = response.text
                 if target is None:
@@ -335,6 +383,7 @@ def transcribe(
                     raise
                 failures += 1
                 progress.console.print(f"[red]✗[/red] {prefix}{escape(src.name)}: {escape(exc.message)}")
+    report.finish()
     if failures:
         raise UserError(f"{failures} of {len(files)} files failed.", "See the errors above; the other files were transcribed.")
 
@@ -396,6 +445,9 @@ def speak(
         Optional[str], typer.Option("--out", "-o", help="Output .wav or .mp3. Use - for stdout.", show_default=False)
     ] = None,
     play: Annotated[bool, typer.Option("--play", "-p", help="Play the audio when done.")] = False,
+    progress_file: Annotated[
+        Optional[Path], typer.Option("--progress-file", help="Keep this file updated with the progress (0 to 1), for scripts.")
+    ] = None,
 ) -> None:
     """Turn text into speech.
 
@@ -414,6 +466,7 @@ def speak(
     tts = require_model("tts", model, cfg)
 
     write_to = target or Path(tempfile.mkstemp(prefix="vox-", suffix=".wav")[1])
+    report = ProgressFile(progress_file)
     try:
         with _progress() as progress:
             task = progress.add_task("Connecting to vox", total=None)
@@ -427,8 +480,9 @@ def speak(
                 speed=speed,
                 response_format=fmt,
                 out=write_to,
-                on_job=_job_updater(progress, task, tts.id, working),
+                on_job=_job_updater(progress, task, tts.id, working, report),
             )
+        report.finish()
         seconds = float(response.headers.get("x-vox-duration") or 0)
         used_voice = response.headers.get("x-vox-voice") or voice or ""
         details = f"[dim]({seconds:.1f}s of audio, {tts.id}{', ' + used_voice if used_voice else ''})[/dim]"

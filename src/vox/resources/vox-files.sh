@@ -18,13 +18,18 @@ notify() {
 mode="$1"
 [ "$#" -gt 0 ] && shift
 case "$mode" in
-  transcribe) ext="txt" ;;
-  speak) ext="wav" ;;
+  transcribe) ext="txt"; verb="Transcribing" ;;
+  speak) ext="wav"; verb="Speaking" ;;
   *) echo "usage: vox-files.sh transcribe|speak FILE..." >&2; exit 1 ;;
 esac
 if [ "$#" -eq 0 ]; then
   notify "vox" "No files were selected."
   exit 1
+fi
+if [ "$#" -eq 1 ]; then
+  notify "vox" "$verb $(basename "$1")"
+else
+  notify "vox" "$verb $# files"
 fi
 
 total=$#

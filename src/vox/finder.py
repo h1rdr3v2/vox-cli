@@ -65,17 +65,30 @@ def write_helper() -> Path:
     return target
 
 
+# macOS shows a Quick Action's progress by counting finished steps, so each
+# Quick Action has this many steps; each returns at the next tenth of the work.
+PROGRESS_STEPS = 10
+
+
 def shell_command(action: QuickAction, helper: Path) -> str:
+    """One command that does the whole job (for a Shortcut, or by hand)."""
     return f'{shlex.quote(str(helper))} {action.mode} "$@"'
+
+
+def step_commands(action: QuickAction, helper: Path) -> list[str]:
+    """The Quick Action's steps: the first starts the job, each passes it on."""
+    helper_arg = shlex.quote(str(helper))
+    first = f'{helper_arg} step 1 {action.mode} "$@"'
+    return [first] + [f'{helper_arg} step {n} "$@"' for n in range(2, PROGRESS_STEPS + 1)]
 
 
 def _uuid() -> str:
     return str(uuid.uuid4()).upper()
 
 
-def _document(command: str) -> dict:
-    """An Automator Quick Action with one Run Shell Script action (input as arguments)."""
-    action = {
+def _shell_action(command: str, index: int) -> dict:
+    """A Run Shell Script action that takes its input as arguments."""
+    return {
         "AMAccepts": {"Container": "List", "Optional": True, "Types": ["com.apple.cocoa.path"]},
         "AMActionVersion": "2.0.3",
         "AMApplication": ["Automator"],
@@ -109,15 +122,27 @@ def _document(command: str) -> dict:
         },
         "conversionLabel": 0,
         "isViewVisible": 1,
-        "location": "309.000000:305.000000",
+        "location": f"309.000000:{305 + 120 * index}.000000",
         "nibPath": f"{SHELL_ACTION}/Contents/Resources/Base.lproj/main.nib",
     }
+
+
+def _document(commands: list[str]) -> dict:
+    """An Automator Quick Action running shell commands in order, each step's
+    output (one line per argument) becoming the next step's arguments."""
+    actions = [_shell_action(command, i) for i, command in enumerate(commands)]
+    connectors = {}
+    for before, after in zip(actions, actions[1:], strict=False):
+        connectors[_uuid()] = {
+            "from": f"{before['UUID']} - {before['UUID']}",
+            "to": f"{after['UUID']} - {after['UUID']}",
+        }
     return {
         "AMApplicationBuild": "534",
         "AMApplicationVersion": "2.10",
         "AMDocumentVersion": "2",
-        "actions": [{"action": action, "isViewVisible": 1}],
-        "connectors": {},
+        "actions": [{"action": action, "isViewVisible": 1} for action in actions],
+        "connectors": connectors,
         "workflowMetaData": {
             "applicationBundleID": "com.apple.finder",
             "applicationBundleIDsByPath": {"/System/Library/CoreServices/Finder.app": "com.apple.finder"},
@@ -169,7 +194,7 @@ def install_quick_actions(helper: Path) -> list[Path]:
         with open(contents / "Info.plist", "wb") as fh:
             plistlib.dump(_info(action), fh)
         with open(contents / "document.wflow", "wb") as fh:
-            plistlib.dump(_document(shell_command(action, helper)), fh)
+            plistlib.dump(_document(step_commands(action, helper)), fh)
         written.append(workflow_path(action))
     if os.access(PBS, os.X_OK):
         subprocess.run([PBS, "-update"], capture_output=True, timeout=30)
