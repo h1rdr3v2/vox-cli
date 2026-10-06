@@ -6,7 +6,7 @@ class Vox < Formula
   homepage "https://github.com/h1rdr3v2/vox-cli"
   url "https://github.com/h1rdr3v2/vox-cli.git",
       tag:      "v0.2.0",
-      revision: "REVISION"
+      revision: "5e426ac50bdb204f2922e3f8b33dd86d026ef181"
   head "https://github.com/h1rdr3v2/vox-cli.git", branch: "main"
 
   depends_on "ffmpeg"
