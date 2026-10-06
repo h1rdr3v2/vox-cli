@@ -122,8 +122,35 @@ def test_whisper_file_selection():
     assert MLXWhisperEngine.select_files(both) == ["config.json", "weights.safetensors"]
     with pytest.raises(ValueError):
         MLXWhisperEngine.select_files(["config.json", "model.bin"])
+    # mlx-audio conversions (mlx-community/whisper-*-asr-*): alignment heads in generation_config.json
+    asr = ["config.json", "generation_config.json", "model.safetensors", "model.safetensors.index.json", "tokenizer.json", "vocab.json"]
+    assert MLXWhisperEngine.select_files(asr) == ["config.json", "model.safetensors", "generation_config.json"]
     with pytest.raises(ValueError):
         MLXWhisperEngine.check_config({"model_type": "llama"})
+    MLXWhisperEngine.check_config({"n_mels": 80, "n_audio_ctx": 1500, "n_audio_state": 384, "n_text_ctx": 448, "n_vocab": 51865})
+    MLXWhisperEngine.check_config({"model_type": "whisper", "d_model": 384, "encoder_layers": 4})
+
+
+def test_whisper_tokenizer():
+    pytest.importorskip("tiktoken")
+    from vox.engines.whisper_tokenizer import get_tokenizer
+
+    # The vocabulary sizes match the models': v1/v2 (99 languages), v3 (100), English-only.
+    v2 = get_tokenizer(True, num_languages=99, language="fr")
+    v3 = get_tokenizer(True, num_languages=100)
+    en = get_tokenizer(False, num_languages=99)
+    assert [t.encoding.n_vocab for t in (v2, v3, en)] == [51865, 51866, 51864]
+    assert (v2.eot, v2.sot, v2.transcribe, v2.no_timestamps, v2.timestamp_begin) == (50257, 50258, 50359, 50363, 50364)
+    assert v2.sot_sequence == (50258, 50265, 50359)  # <|fr|> is the seventh language
+    assert v3.sot_sequence == (50258, 50259, 50360) and v3.timestamp_begin == 50365  # <|yue|> shifts the rest
+    assert en.sot_sequence == (50257,) and en.language is None
+    assert len(v3.all_language_tokens) == len(v3.all_language_codes) == 100
+    text = " Bonjour à tous, 42 fois!"
+    assert v2.decode(v2.encode(text)) == text
+    words, _ = v2.split_to_word_tokens(v2.encode(" Hello world, again"))
+    assert words == [" Hello", " world", ",", " again"]
+    with pytest.raises(ValueError):
+        get_tokenizer(True, num_languages=99, language="klingon")
 
 
 def test_kokoro_file_selection():

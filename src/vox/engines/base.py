@@ -1,10 +1,10 @@
 """Engine interfaces.
 
-An engine wraps one inference backend (mlx-whisper, mlx-audio, and later
+An engine wraps one inference backend (MLX Whisper, mlx-audio, and later
 perhaps whisper.cpp). The CLI never touches engines; only the server does.
 
-Engine modules must stay cheap to import: heavy libraries (mlx, torch,
-spaCy) are imported inside load(). Class-level helpers such as
+Engine modules must stay cheap to import: heavy libraries (mlx, spaCy)
+are imported inside load(). Class-level helpers such as
 select_files() and list_voices() are used by `vox models pull` and
 `vox voices` without loading anything.
 """

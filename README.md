@@ -10,7 +10,7 @@ AI coding agents reinstall Whisper and torch in every project. vox is one local 
 
 | | Apple Silicon Mac | Linux (x86_64, arm64) |
 |---|---|---|
-| Transcription | `mlx-whisper` (GPU via Metal) | `faster-whisper` (CPU, or NVIDIA GPU) |
+| Transcription | Whisper on `mlx-audio` (GPU via Metal) | `faster-whisper` (CPU, or NVIDIA GPU) |
 | Speech | Kokoro on `mlx-audio` | Kokoro on ONNX Runtime |
 | Right-click menu | Finder Quick Actions | GNOME Files, Nemo, Caja, Dolphin |
 
@@ -47,7 +47,7 @@ pipx install git+https://github.com/h1rdr3v2/vox-cli
 
 With uv or pipx, `vox` lands on your PATH (in `~/.local/bin`). If your shell cannot find it, run `uv tool update-shell` (or `pipx ensurepath`) and open a new terminal. uv and pipx are interchangeable here; plain `pip install` into a virtual environment also works. To remove vox and everything it created, run `vox uninstall` (see [Uninstall](#uninstall)).
 
-The very first transcription or speech after installing on a Mac can take up to a minute while macOS checks the newly installed libraries (MLX, torch, spaCy) once. After that, a cold start takes a few seconds.
+The very first transcription or speech after installing on a Mac can take up to a minute while macOS checks the newly installed libraries (MLX, spaCy) once. After that, a cold start takes a few seconds.
 
 The PyPI distribution name is `vox-cli`. The command is `vox`.
 

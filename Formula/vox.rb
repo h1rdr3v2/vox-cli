@@ -29,8 +29,8 @@ class Vox < Formula
     bin.install_symlink libexec/"bin/vox"
   end
 
-  # The dependencies (MLX and torch on macOS, CTranslate2 and ONNX Runtime on
-  # Linux, spaCy) are prebuilt wheels from PyPI. Installed during `install`,
+  # The dependencies (MLX on macOS, CTranslate2 and ONNX Runtime on Linux,
+  # spaCy) are prebuilt wheels from PyPI. Installed during `install`,
   # Homebrew would then rewrite their libraries, which fails for some and
   # breaks code signatures. Post-install runs after that and still writes
   # inside the keg, so `brew uninstall vox` removes everything.

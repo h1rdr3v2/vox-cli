@@ -33,9 +33,11 @@ dependencies = [
     "num2words",
     "phonemizer-fork",
     "espeakng-loader",
-    # Apple Silicon engines (MLX)
-    "mlx-whisper>=0.4.3,<0.5; sys_platform == 'darwin' and platform_machine == 'arm64'",
+    # Apple Silicon engines (MLX). Whisper runs on mlx-audio's implementation
+    # with vox's own tokenizer (tiktoken), not the mlx-whisper package, which
+    # needs torch to install.
     "mlx-audio>=0.5.8,<0.6; sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "tiktoken>=0.7; sys_platform == 'darwin' and platform_machine == 'arm64'",
     # Linux engines (CTranslate2 and ONNX Runtime, CPU or NVIDIA GPU)
     "faster-whisper>=1.1,<2; sys_platform == 'linux'",
     "onnxruntime>=1.18; sys_platform == 'linux'",
