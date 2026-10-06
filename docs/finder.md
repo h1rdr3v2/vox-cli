@@ -2,7 +2,7 @@
 
 Two right-click actions for Finder:
 
-- **Transcribe with vox**: for audio and video files. Runs `vox transcribe` on each file and writes a `.txt` next to it.
+- **Transcribe with vox**: for audio and video files. Runs `vox transcribe` on each file and writes the transcript next to it, in your `default_format` (`.txt` unless you changed it with `vox config set default_format srt`).
 - **Speak with vox**: for `.txt` and `.md` files. Runs `vox speak` on each file and writes a `.wav` next to it.
 
 Both show a notification when they start ("Transcribing interview.m4a") and when they finish ("Saved interview.txt", or what went wrong). While they run, the gear in the menu bar shows real progress in 10% steps; click its ✕ to cancel.
@@ -73,7 +73,7 @@ Same steps, named **Speak with vox**, receiving **Text files** (or **Files**), w
 ## What the helper does
 
 ```
-vox-finder.sh transcribe FILE...    # FILE.txt next to each file
+vox-finder.sh transcribe FILE...    # FILE.txt (or your default_format) next to each file
 vox-finder.sh speak FILE...         # FILE.wav next to each file
 ```
 

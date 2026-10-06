@@ -2,7 +2,7 @@
 # vox file-manager helper for Linux. Runs vox on files passed by a right-click
 # action and shows a desktop notification when done. Written by `vox setup files`.
 #
-# Usage: vox-files.sh transcribe FILE...   (writes FILE.txt next to each file)
+# Usage: vox-files.sh transcribe FILE...   (writes FILE.txt, or your default_format, next to each file)
 #        vox-files.sh speak FILE...        (writes FILE.wav next to each file)
 
 # File managers may start actions with a minimal PATH, so use absolute paths.
@@ -10,6 +10,10 @@ run_vox() { __VOX__ "$@"; }
 export PATH="__PATH__:/usr/local/bin:/usr/bin:/bin"
 
 notify() {
+  if [ -n "$VOX_FILES_NOTIFY_LOG" ]; then  # tests read notifications from a file
+    printf '%s|%s\n' "$1" "$2" >> "$VOX_FILES_NOTIFY_LOG"
+    return
+  fi
   if command -v notify-send >/dev/null 2>&1; then
     notify-send "$1" "$2"
   fi
@@ -18,7 +22,12 @@ notify() {
 mode="$1"
 [ "$#" -gt 0 ] && shift
 case "$mode" in
-  transcribe) ext="txt"; verb="Transcribing" ;;
+  transcribe)
+    # Transcripts use the default_format setting: txt, srt, vtt or json.
+    ext=$(run_vox config get default_format 2>/dev/null)
+    case "$ext" in txt|srt|vtt|json) ;; *) ext="txt" ;; esac
+    verb="Transcribing"
+    ;;
   speak) ext="wav"; verb="Speaking" ;;
   *) echo "usage: vox-files.sh transcribe|speak FILE..." >&2; exit 1 ;;
 esac

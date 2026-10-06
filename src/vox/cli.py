@@ -974,6 +974,15 @@ def config_show(ctx: typer.Context) -> None:
     say(f"[dim]Change a value with: vox config set KEY VALUE. Models: {paths.pretty(paths.models_dir())}[/dim]")
 
 
+@config_app.command("get")
+def config_get(key: Annotated[str, typer.Argument(help="Setting name.")]) -> None:
+    """Print one setting's value (empty if unset), for scripts."""
+    if key not in KEYS:
+        raise UserError(f"Unknown config key: {key}.", "Known keys: " + ", ".join(KEYS))
+    value = getattr(load_config(), key)
+    out.print("" if value is None else str(value), markup=False, highlight=False)
+
+
 @config_app.command("set")
 def config_set(
     key: Annotated[str, typer.Argument(help="Setting name.")],

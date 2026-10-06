@@ -173,6 +173,10 @@ def test_config_commands(run_cli):
     assert load_config().idle_timeout == 600
     assert run_cli("config", "set", "port", "abc").code == 1
     assert run_cli("config", "set", "nope", "1").code == 1
+    got = run_cli("config", "get", "idle_timeout")
+    assert got.code == 0 and got.out.strip() == "600"
+    assert run_cli("config", "get", "default_voice").out.strip() == ""
+    assert run_cli("config", "get", "nope").code == 1
     assert run_cli("config", "unset", "idle_timeout").code == 0
     assert load_config().idle_timeout == 300
 

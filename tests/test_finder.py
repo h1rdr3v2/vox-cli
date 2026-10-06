@@ -46,23 +46,30 @@ def test_progress_file(tmp_path):
 
 
 FAKE_VOX = """#!/bin/sh
-# Stands in for vox: writes progress, then the output file next to the input.
+# Stands in for vox: `config get default_format` answers vtt; transcribe and
+# speak write progress, then the output file next to the input.
+if [ "$1" = config ]; then echo vtt; exit 0; fi
 mode="$1"; file="$2"; progress="$4"
 case "$file" in *fail*) echo "Error: could not read it." >&2; exit 1 ;; esac
-echo 0.5 > "$progress"; sleep 0.2; echo 1 > "$progress"
-case "$mode" in transcribe) echo text > "${file%.*}.txt" ;; speak) echo wav > "${file%.*}.wav" ;; esac
+[ -n "$progress" ] && { echo 0.5 > "$progress"; sleep 0.2; echo 1 > "$progress"; }
+case "$mode" in transcribe) echo text > "${file%.*}.vtt" ;; speak) echo wav > "${file%.*}.wav" ;; esac
 """
+
+
+def _fake_vox(tmp_path: Path) -> Path:
+    fake = tmp_path / "fake-vox"
+    fake.write_text(FAKE_VOX)
+    fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
+    return fake
 
 
 @pytest.fixture
 def helper(tmp_path, monkeypatch):
     if sys.platform != "darwin" or not shutil.which("zsh"):
         pytest.skip("the Finder helper is a macOS zsh script")
-    fake = tmp_path / "fake-vox"
-    fake.write_text(FAKE_VOX)
-    fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
+    fake = _fake_vox(tmp_path)
     monkeypatch.setattr(finder, "vox_command", lambda: [str(fake)])
-    monkeypatch.setenv("VOX_FINDER_QUIET", "1")
+    monkeypatch.setenv("VOX_FINDER_NOTIFY_LOG", str(tmp_path / "notifications"))
     monkeypatch.setenv("TMPDIR", str(tmp_path))
     return finder.write_helper()
 
@@ -82,8 +89,14 @@ def test_helper_steps_hand_the_job_along(helper, tmp_path):
         assert result.returncode == 0 and result.stdout.strip() == job
     last = _run(helper, "step", "10", job)
     assert last.returncode == 0 and last.stdout == ""
-    assert (tmp_path / "my clip.txt").read_text() == "text\n"
+    assert (tmp_path / "my clip.vtt").read_text() == "text\n"
     assert not Path(job).exists()
+    # Named after the default_format setting, not always .txt.
+    assert _notifications(tmp_path) == ["vox|Transcribing my clip.m4a", "vox|Saved my clip.vtt"]
+
+
+def _notifications(tmp_path: Path) -> list[str]:
+    return (tmp_path / "notifications").read_text().splitlines()
 
 
 def test_helper_one_shot_mode(helper, tmp_path):
@@ -93,6 +106,10 @@ def test_helper_one_shot_mode(helper, tmp_path):
     assert _run(helper, "speak", str(good)).returncode == 0
     assert (tmp_path / "a.wav").exists()
     assert _run(helper, "speak", str(good), str(bad)).returncode == 1
+    notes = _notifications(tmp_path)
+    assert notes[:2] == ["vox|Speaking a.txt", "vox|Saved a.wav"]
+    assert notes[2] == "vox|Speaking 2 files"
+    assert notes[3].startswith("vox: 1 of 2 failed|fail.txt: Error: could not read it.")
 
 
 def test_helper_ignores_bad_job_paths(helper, tmp_path):
@@ -101,3 +118,20 @@ def test_helper_ignores_bad_job_paths(helper, tmp_path):
     assert _run(helper, "step", "5", str(keep)).returncode == 0
     assert keep.exists()
     assert _run(helper, "step", "x").returncode == 1
+
+
+def test_linux_helper_names_and_notifications(tmp_path, monkeypatch):
+    from vox import desktop
+
+    fake = _fake_vox(tmp_path)
+    monkeypatch.setattr(desktop, "vox_command", lambda: [str(fake)])
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    log = tmp_path / "notifications"
+    clip = tmp_path / "talk.mp3"
+    clip.write_bytes(b"")
+    helper = desktop.write_helper()
+    env = {**os.environ, "VOX_FILES_NOTIFY_LOG": str(log)}
+    result = subprocess.run(["/bin/sh", str(helper), "transcribe", str(clip)], capture_output=True, text=True, env=env, timeout=60)
+    assert result.returncode == 0, result.stderr
+    assert (tmp_path / "talk.vtt").exists()
+    assert log.read_text().splitlines() == ["vox|Transcribing talk.mp3", "vox|Saved talk.vtt"]

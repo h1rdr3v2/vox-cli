@@ -2,7 +2,7 @@
 # vox Finder helper. Runs vox on files passed by a Finder Quick Action or a
 # Shortcut and shows a notification when done. Written by `vox setup finder`.
 #
-# Usage: vox-finder.sh transcribe FILE...   (writes FILE.txt next to each file)
+# Usage: vox-finder.sh transcribe FILE...   (writes FILE.txt, or your default_format, next to each file)
 #        vox-finder.sh speak FILE...        (writes FILE.wav next to each file)
 #        vox-finder.sh step 1 MODE FILE...  (Quick Action step 1: start, wait for 10%)
 #        vox-finder.sh step N JOB           (Quick Action steps 2 to 10)
@@ -17,7 +17,10 @@ export PATH="__PATH__:/usr/bin:/bin:/usr/sbin:/sbin"
 STEPS=10
 
 notify() {
-  [[ -n $VOX_FINDER_QUIET ]] && return  # for tests
+  if [[ -n $VOX_FINDER_NOTIFY_LOG ]]; then  # tests read notifications from a file
+    print -r -- "$1|$2" >> "$VOX_FINDER_NOTIFY_LOG"
+    return
+  fi
   /usr/bin/osascript - "$1" "$2" <<'APPLESCRIPT' >/dev/null 2>&1
 on run argv
   display notification (item 2 of argv) with title (item 1 of argv)
@@ -38,7 +41,12 @@ run_all() {
   local total=$# ok=0 failed=0 index=0 first_error="" last_written=""
   local verb
   case $mode in
-    transcribe) ext="txt"; verb="Transcribing" ;;
+    transcribe)
+      # Transcripts use the default_format setting: txt, srt, vtt or json.
+      ext=$("${VOX[@]}" config get default_format 2>/dev/null)
+      [[ $ext == (txt|srt|vtt|json) ]] || ext="txt"
+      verb="Transcribing"
+      ;;
     speak) ext="wav"; verb="Speaking" ;;
   esac
   if (( total == 1 )); then
