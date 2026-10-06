@@ -2,7 +2,7 @@
 
 import os
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 # vox never sends telemetry. Model downloads are the only network traffic.
 os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
