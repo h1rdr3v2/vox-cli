@@ -100,7 +100,7 @@ vox start   # starts the server in the background; it exits after 5 idle minutes
 ```python
 from openai import OpenAI
 
-client = OpenAI(base_url="http://127.0.0.1:8880/v1", api_key="not-needed")
+client = OpenAI(base_url="http://127.0.0.1:8880/v1", api_key="vox")
 
 with open("meeting.m4a", "rb") as f:
     print(client.audio.transcriptions.create(model="whisper-1", file=f).text)
