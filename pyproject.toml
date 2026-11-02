@@ -40,18 +40,18 @@ dependencies = [
     "tiktoken>=0.7; sys_platform == 'darwin' and platform_machine == 'arm64'",
     # Linux engines (CTranslate2 and ONNX Runtime, CPU or NVIDIA GPU)
     "faster-whisper>=1.1,<2; sys_platform == 'linux'",
-    "onnxruntime>=1.18; sys_platform == 'linux'",
+    "onnxruntime>=1.31.0; sys_platform == 'linux'",
 ]
 
 [project.optional-dependencies]
 # The Linux engines on any platform, for example to try them on a Mac.
-portable = ["faster-whisper>=1.1,<2", "onnxruntime>=1.18"]
+portable = ["faster-whisper>=1.1,<2", "onnxruntime>=1.31.0"]
 
 [project.scripts]
 vox = "vox.cli:main"
 
 [dependency-groups]
-dev = ["pytest>=8", "faster-whisper>=1.1,<2", "onnxruntime>=1.18"]
+dev = ["pytest>=8", "faster-whisper>=1.1,<2", "onnxruntime>=1.31.0"]
 
 [build-system]
 requires = ["hatchling"]
