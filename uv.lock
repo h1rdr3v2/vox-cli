@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.12'",
@@ -955,7 +955,7 @@ wheels = [
 
 [[package]]
 name = "mlx-audio"
-version = "0.5.8"
+version = "0.5.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "huggingface-hub" },
@@ -969,9 +969,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "transformers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cd/a6/c75b328fc1059d0a3d56cf8330e9df6745dfe8c6ec38a3c6cfef2d42ad5f/mlx_audio-0.5.8.tar.gz", hash = "sha256:55a7378a4d27dddeba2d989f71f255ce70498b3f1c27928a8b1fb0baf3577d9e", size = 1762499, upload-time = "2026-10-05T18:31:07.108Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/cc/4a/ea4746d0c14b75d835dd5164d0e8bba19598248cb29831c0c8e8b98310b9/mlx_audio-0.5.9.tar.gz", hash = "sha256:ad2862464d2d5b8ab4b9394a226d044e7022da594329427ef16ca8e93c08e6b5", size = 1776885, upload-time = "2026-10-13T18:37:33.452Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/77/b4/5fe7a122537321a1305c95d57280542691deddcd102fa8e84149525108bb/mlx_audio-0.5.8-py3-none-any.whl", hash = "sha256:cf2eaef3d5d965d3a0a5c98ab68d4867db51daace190a77b3b9576577a7d2eab", size = 2121074, upload-time = "2026-10-05T18:31:05.651Z" },
+    { url = "https://files.pythonhosted.org/packages/57/3c/5864cf8c30661049db2ed22d6c2ab1137691f3f49df3c1fd4c7b885953da/mlx_audio-0.5.9-py3-none-any.whl", hash = "sha256:fa662cf24cbca69cdd912612cdb677e65f77c6329a95906cc80b50e5b4689d6b", size = 2136508, upload-time = "2026-10-13T18:37:31.225Z" },
 ]
 
 [[package]]
@@ -2429,7 +2429,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
     { name = "huggingface-hub", specifier = ">=1.0" },
     { name = "misaki", specifier = ">=0.9.4,<0.10" },
-    { name = "mlx-audio", marker = "platform_machine == 'arm64' and sys_platform == 'darwin'", specifier = ">=0.5.8,<0.6" },
+    { name = "mlx-audio", marker = "platform_machine == 'arm64' and sys_platform == 'darwin'", specifier = ">=0.5.9,<0.6" },
     { name = "num2words" },
     { name = "numpy", specifier = ">=1.26" },
     { name = "onnxruntime", marker = "sys_platform == 'linux'", specifier = ">=1.18" },
